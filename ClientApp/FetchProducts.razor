@@ -1,0 +1,72 @@
+@page "/fetchproducts"
+@using System.Text.Json
+@using ClientApp.Services
+@inject ProductService ProductService
+
+<h3>Product List</h3>
+
+@if (errorMessage != null)
+{
+    <p style="color:red">@errorMessage</p>
+}
+else if (products == null)
+{
+    <p>Loading...</p>
+}
+else
+{
+    <ul>
+        @foreach (var product in products)
+        {
+            <li>@product.Name (@product.Category?.Name) - @product.Price.ToString("C") - Stock: @product.Stock</li>
+        }
+    </ul>
+}
+
+<button class="btn btn-secondary" @onclick="RefreshAsync" disabled="@isLoading">
+    @(isLoading ? "Refreshing..." : "Refresh")
+</button>
+
+@if (lastUpdated != null)
+{
+    <p class="mt-2"><small>Last updated: @lastUpdated.Value.ToString("T")</small></p>
+}
+
+@code {
+    private Product[]? products;
+    private string? errorMessage;
+    private bool isLoading;
+    private DateTime? lastUpdated;
+
+    protected override Task OnInitializedAsync() => LoadAsync(forceRefresh: false);
+
+    private Task RefreshAsync() => LoadAsync(forceRefresh: true);
+
+    private async Task LoadAsync(bool forceRefresh)
+    {
+        errorMessage = null;
+        isLoading = true;
+        try
+        {
+            products = await ProductService.GetProductsAsync(forceRefresh);
+            lastUpdated = DateTime.Now;
+        }
+        catch (OperationCanceledException)
+        {
+            errorMessage = "The request timed out. Please try again.";
+        }
+        catch (HttpRequestException ex)
+        {
+            errorMessage = $"Could not load products: {ex.Message}";
+        }
+        catch (JsonException ex)
+        {
+            Console.WriteLine($"Error: {ex.Message}");
+            errorMessage = "The server returned an invalid response.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}
